@@ -11,35 +11,25 @@ export default function InventoryPage() {
   return (
     <div className="flex flex-col h-full">
       {/* Topbar */}
-      <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-3 shrink-0">
-        <div className="flex-1">
-          <h1 className="text-base font-bold text-slate-900">Inventory</h1>
-        </div>
-        <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8">
-          <Download className="w-3.5 h-3.5" /> Export CSV
+      <div className="bg-white border-b border-gray-100 px-6 py-3 flex items-center gap-2 shrink-0">
+        <h1 className="text-sm font-semibold text-gray-900 flex-1">Inventory</h1>
+        <Button variant="outline" size="sm">
+          <Download />
+          Export
         </Button>
-        <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8">
-          <Upload className="w-3.5 h-3.5" /> Import
+        <Button variant="outline" size="sm">
+          <Upload />
+          Import
         </Button>
-        <Button size="sm" className="gap-1.5 text-xs h-8 bg-indigo-600 hover:bg-indigo-700">
-          <Plus className="w-3.5 h-3.5" /> Add Slab
+        <Button size="sm">
+          <Plus />
+          Add Slab
         </Button>
       </div>
 
-      {/* KPI cards */}
-      <Suspense>
-        <KpiCards />
-      </Suspense>
-
-      {/* Filters */}
-      <Suspense>
-        <InventoryFilters />
-      </Suspense>
-
-      {/* Table */}
-      <Suspense>
-        <InventoryTable />
-      </Suspense>
+      <Suspense><KpiCards /></Suspense>
+      <Suspense><InventoryFilters /></Suspense>
+      <Suspense><InventoryTable /></Suspense>
     </div>
   )
 }
