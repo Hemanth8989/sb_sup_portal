@@ -76,6 +76,65 @@ export interface ApiError {
   errors?: Record<string, string[]>
 }
 
+export interface WarehouseDto {
+  id: string
+  name: string
+  addressLine1: string | null
+  city: string | null
+  stateProvince: string | null
+  postalCode: string | null
+  country: string
+  phone: string | null
+  isPrimary: boolean
+  isActive: boolean
+  slabCount: number
+  availableCount: number
+  reservedCount: number
+  onHoldCount: number
+  estimatedValue: number | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BundleDto {
+  id: string
+  bundleRef: string
+  materialName: string
+  quarryName: string | null
+  originCountry: string | null
+  arrivalDate: string | null
+  invoiceRef: string | null
+  notes: string | null
+  slabCount: number
+  activeCount: number
+  availableCount: number
+  totalSqftAvailable: number | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BundleSlabDto {
+  id: string
+  internalRef: string
+  blockNumber: string | null
+  thicknessCm: number
+  finish: string
+  grossLengthMm: number
+  grossWidthMm: number
+  netSqft: number
+  qualityGrade: string
+  status: SlabStatus
+  rackLocation: string | null
+  warehouseName: string | null
+  priceOverride: number | null
+  primaryPhotoUrl: string | null
+  updatedAt: string
+}
+
+export interface BundleDetailDto extends BundleDto {
+  slabs: BundleSlabDto[]
+}
+
 export interface SupplierSlabFilterParams {
   searchQuery?: string
   statuses?: SlabStatus[]
