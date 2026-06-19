@@ -29,10 +29,19 @@ export function setTokenProvider(fn: GetTokenFn) {
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+function buildUrl(path: string, params?: Record<string, unknown>): string {
+  if (!params) return `${BASE_URL}${path}`
+  const qs = Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== null)
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+    .join('&')
+  return qs ? `${BASE_URL}${path}?${qs}` : `${BASE_URL}${path}`
+}
+
+async function request<T>(path: string, init: RequestInit = {}, params?: Record<string, unknown>): Promise<T> {
   const token = await getToken()
 
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(buildUrl(path, params), {
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -56,7 +65,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
-  get:    <T>(path: string)                => request<T>(path),
+  get:    <T>(path: string, opts?: { params?: Record<string, unknown> }) => request<T>(path, {}, opts?.params),
   post:   <T>(path: string, body: unknown) => request<T>(path, { method: 'POST',   body: JSON.stringify(body) }),
   put:    <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT',    body: JSON.stringify(body) }),
   patch:  <T>(path: string, body: unknown) => request<T>(path, { method: 'PATCH',  body: JSON.stringify(body) }),
