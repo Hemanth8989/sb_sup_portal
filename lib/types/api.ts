@@ -94,8 +94,49 @@ export interface WarehouseDto {
   reservedCount: number
   onHoldCount: number
   estimatedValue: number | null
+  productSkuCount: number
+  lowStockCount: number
+  productStockValue: number | null
   createdAt: string
   updatedAt: string
+}
+
+export interface WarehouseProductStockDto {
+  id: string
+  warehouseId: string
+  variantId: string
+  productId: string
+  sku: string
+  variantName: string
+  categoryCode: string
+  categoryLabel: string
+  unitOfMeasure: string
+  basePrice: number
+  currency: string
+  qtyOnHand: number
+  qtyReserved: number
+  qtyAvailable: number
+  rackLocation: string | null
+  reorderPoint: number | null
+  reorderQty: number | null
+  isLowStock: boolean
+  primaryPhotoUrl: string | null
+  updatedAt: string
+}
+
+export interface StockMovementDto {
+  id: string
+  variantId: string
+  variantName: string
+  sku: string
+  fromWarehouse: string | null
+  fromWarehouseName: string | null
+  toWarehouse: string | null
+  toWarehouseName: string | null
+  qty: number
+  movementType: string
+  notes: string | null
+  createdAt: string
 }
 
 // ── Bundles ───────────────────────────────────────────────────────────────────

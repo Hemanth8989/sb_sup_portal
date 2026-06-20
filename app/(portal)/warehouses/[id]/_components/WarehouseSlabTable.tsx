@@ -1,7 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { useSupplierSlabs, useUpdateSlabStatus, useDeleteSlab, useBulkUpdateSlabStatus } from '@/lib/hooks/useSupplierSlabs'
+import {
+  useSupplierSlabs,
+  useBulkUpdateSlabStatus,
+} from '@/lib/hooks/useSupplierSlabs'
 import { SlabStatusBadge } from '@/app/(portal)/inventory/_components/SlabStatusBadge'
 import { SlabActionsMenu } from '@/app/(portal)/inventory/_components/SlabActionsMenu'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -12,20 +15,20 @@ import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from '@/components/ui/table'
 import { formatDimensions, formatSqft, formatPrice, formatThickness } from '@/lib/utils/formatters'
-import { Badge } from '@/components/ui/badge'
-import { ImageIcon, Search, PauseCircle, PlayCircle, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
-import type { SupplierSlabDto, SlabStatus } from '@/lib/types/api'
+import {
+  Search, PauseCircle, PlayCircle, ArrowRightLeft,
+  ChevronLeft, ChevronRight, ImageIcon, X,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import type { SlabStatus } from '@/lib/types/api'
 
-const STATUS_CHIPS: SlabStatus[] = ['available', 'reserved', 'hold', 'allocated', 'shipped']
-
-const STATUS_COLOR: Record<string, string> = {
-  available:  'bg-green-50 text-green-700',
-  reserved:   'bg-blue-50 text-blue-700',
-  hold:       'bg-amber-50 text-amber-700',
-  allocated:  'bg-violet-50 text-violet-700',
-  shipped:    'bg-gray-100 text-gray-500',
-  sold:       'bg-gray-100 text-gray-400',
-}
+const STATUS_CHIPS: { key: SlabStatus; label: string; active: string; inactive: string }[] = [
+  { key: 'available', label: 'Available', active: 'bg-emerald-50 text-emerald-700 border-emerald-200', inactive: 'bg-white text-gray-500 border-gray-200 hover:border-gray-300' },
+  { key: 'reserved',  label: 'Reserved',  active: 'bg-blue-50 text-blue-700 border-blue-200',         inactive: 'bg-white text-gray-500 border-gray-200 hover:border-gray-300' },
+  { key: 'hold',      label: 'On Hold',   active: 'bg-amber-50 text-amber-700 border-amber-200',      inactive: 'bg-white text-gray-500 border-gray-200 hover:border-gray-300' },
+  { key: 'allocated', label: 'Allocated', active: 'bg-violet-50 text-violet-700 border-violet-200',   inactive: 'bg-white text-gray-500 border-gray-200 hover:border-gray-300' },
+  { key: 'shipped',   label: 'Shipped',   active: 'bg-gray-100 text-gray-600 border-gray-300',        inactive: 'bg-white text-gray-500 border-gray-200 hover:border-gray-300' },
+]
 
 interface Props {
   warehouseId: string
@@ -37,7 +40,6 @@ export function WarehouseSlabTable({ warehouseId, onTransferRequest }: Props) {
   const [statuses, setStatuses] = useState<SlabStatus[]>([])
   const [page,     setPage]     = useState(1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
-
   const PER_PAGE = 50
 
   const { data, isPending, isError } = useSupplierSlabs({
@@ -45,139 +47,149 @@ export function WarehouseSlabTable({ warehouseId, onTransferRequest }: Props) {
     searchQuery: search || undefined,
     statuses:    statuses.length ? statuses : undefined,
     page,
-    perPage:     PER_PAGE,
+    perPage: PER_PAGE,
   })
 
-  const bulkStatus = useBulkUpdateSlabStatus()
-
-  const slabs      = data?.items ?? []
-  const totalCount = data?.totalCount ?? 0
-  const totalPages = Math.max(1, Math.ceil(totalCount / PER_PAGE))
-  const startItem  = Math.min((page - 1) * PER_PAGE + 1, totalCount)
-  const endItem    = Math.min(page * PER_PAGE, totalCount)
-
-  const allPageIds    = slabs.map(s => s.id)
-  const allPageSelected = allPageIds.length > 0 && allPageIds.every(id => selected.has(id))
-  const someSelected  = selected.size > 0
+  const bulkStatus  = useBulkUpdateSlabStatus()
+  const slabs       = data?.items ?? []
+  const totalCount  = data?.totalCount ?? 0
+  const totalPages  = Math.max(1, Math.ceil(totalCount / PER_PAGE))
+  const startItem   = Math.min((page - 1) * PER_PAGE + 1, totalCount)
+  const endItem     = Math.min(page * PER_PAGE, totalCount)
+  const allPageIds  = slabs.map(s => s.id)
+  const allSelected = allPageIds.length > 0 && allPageIds.every(id => selected.has(id))
 
   function toggleAll() {
-    if (allPageSelected) {
-      setSelected(prev => { const next = new Set(prev); allPageIds.forEach(id => next.delete(id)); return next })
+    if (allSelected) {
+      setSelected(prev => { const n = new Set(prev); allPageIds.forEach(id => n.delete(id)); return n })
     } else {
-      setSelected(prev => { const next = new Set(prev); allPageIds.forEach(id => next.add(id)); return next })
+      setSelected(prev => { const n = new Set(prev); allPageIds.forEach(id => n.add(id)); return n })
     }
   }
 
   function toggleOne(id: string) {
     setSelected(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) { next.delete(id) } else { next.add(id) }
-      return next
+      const n = new Set(prev)
+      if (n.has(id)) { n.delete(id) } else { n.add(id) }
+      return n
     })
   }
 
-  function toggleStatusFilter(s: SlabStatus) {
+  function toggleStatus(s: SlabStatus) {
     setStatuses(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])
     setPage(1)
   }
 
-  function handleBulkStatus(status: string) {
-    bulkStatus.mutate(
-      { slabIds: [...selected], status },
-      { onSuccess: () => setSelected(new Set()) },
-    )
-  }
-
   return (
-    <div className="flex flex-col gap-3">
-      {/* Filter / search bar */}
+    <div className="flex flex-col gap-4">
+
+      {/* Filter bar */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           <Input
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1) }}
-            placeholder="Search ref, material…"
-            className="pl-8 h-8 text-sm w-48"
+            placeholder="Ref, material, lot…"
+            className="pl-8 h-8 w-44 text-sm border-gray-200"
           />
         </div>
-        <div className="flex gap-1">
+
+        <div className="h-5 w-px bg-gray-200" />
+
+        <div className="flex items-center gap-1">
           {STATUS_CHIPS.map(s => (
             <button
-              key={s}
-              onClick={() => toggleStatusFilter(s)}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-medium capitalize transition-colors ${
-                statuses.includes(s) ? STATUS_COLOR[s] + ' ring-1 ring-current' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-              }`}
+              key={s.key}
+              onClick={() => toggleStatus(s.key)}
+              className={cn(
+                'px-2.5 h-7 rounded-md border text-[11px] font-medium transition-colors',
+                statuses.includes(s.key) ? s.active : s.inactive,
+              )}
             >
-              {s}
+              {s.label}
             </button>
           ))}
+          {statuses.length > 0 && (
+            <button
+              onClick={() => { setStatuses([]); setPage(1) }}
+              className="h-7 w-7 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
+
         <div className="flex-1" />
+
         {!isPending && (
-          <span className="text-xs text-muted-foreground">{totalCount} slabs</span>
+          <span className="text-xs text-gray-400">{totalCount} slab{totalCount !== 1 ? 's' : ''}</span>
         )}
       </div>
 
       {/* Bulk action bar */}
-      {someSelected && (
-        <div className="flex items-center gap-2 bg-gray-900 text-white rounded-lg px-4 py-2">
-          <span className="text-xs font-medium">{selected.size} selected</span>
+      {selected.size > 0 && (
+        <div className="flex items-center gap-3 bg-gray-900 text-white rounded-lg px-4 py-2.5">
+          <span className="text-xs font-semibold">{selected.size} selected</span>
           <div className="flex-1" />
-          <Button size="sm" variant="ghost" className="h-7 text-xs text-white hover:bg-white/10 gap-1"
+          <Button
+            size="sm"
+            className="h-7 text-xs bg-white/10 hover:bg-white/20 border-0 gap-1.5"
             disabled={bulkStatus.isPending}
-            onClick={() => handleBulkStatus('hold')}
+            onClick={() => bulkStatus.mutate({ slabIds: [...selected], status: 'hold' }, { onSuccess: () => setSelected(new Set()) })}
           >
             <PauseCircle className="w-3.5 h-3.5" /> Hold
           </Button>
-          <Button size="sm" variant="ghost" className="h-7 text-xs text-white hover:bg-white/10 gap-1"
+          <Button
+            size="sm"
+            className="h-7 text-xs bg-white/10 hover:bg-white/20 border-0 gap-1.5"
             disabled={bulkStatus.isPending}
-            onClick={() => handleBulkStatus('available')}
+            onClick={() => bulkStatus.mutate({ slabIds: [...selected], status: 'available' }, { onSuccess: () => setSelected(new Set()) })}
           >
             <PlayCircle className="w-3.5 h-3.5" /> Release
           </Button>
           {onTransferRequest && (
-            <Button size="sm" variant="ghost" className="h-7 text-xs text-white hover:bg-white/10 gap-1"
+            <Button
+              size="sm"
+              className="h-7 text-xs bg-white/10 hover:bg-white/20 border-0 gap-1.5"
               onClick={() => onTransferRequest([...selected])}
             >
-              Transfer
+              <ArrowRightLeft className="w-3.5 h-3.5" /> Transfer
             </Button>
           )}
-          <button onClick={() => setSelected(new Set())} className="text-white/60 hover:text-white text-xs ml-2">
+          <button
+            onClick={() => setSelected(new Set())}
+            className="text-white/50 hover:text-white text-xs transition-colors"
+          >
             Clear
           </button>
         </div>
       )}
 
       {/* Table */}
-      <div className="rounded-xl border border-gray-100 bg-white overflow-hidden">
+      <div className="rounded-lg border border-gray-200 overflow-hidden">
         <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent border-gray-100">
+          <TableHeader className="bg-gray-50">
+            <TableRow className="border-gray-200 hover:bg-gray-50">
               <TableHead className="w-10 pl-4">
-                <Checkbox
-                  checked={allPageSelected}
-                  onCheckedChange={toggleAll}
-                  aria-label="Select all"
-                />
+                <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Select all" />
               </TableHead>
-              <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Photo</TableHead>
-              <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Material</TableHead>
-              <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Dimensions</TableHead>
-              <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Net sqft</TableHead>
-              <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Finish</TableHead>
-              <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Grade</TableHead>
-              <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Rack</TableHead>
-              <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Price/sqft</TableHead>
-              <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Status</TableHead>
+              <TableHead className="w-10 text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Photo</TableHead>
+              <TableHead className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Material</TableHead>
+              <TableHead className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Dimensions</TableHead>
+              <TableHead className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide text-right">Net sqft</TableHead>
+              <TableHead className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Finish</TableHead>
+              <TableHead className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide text-center">Grade</TableHead>
+              <TableHead className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Rack</TableHead>
+              <TableHead className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide text-right">Price/sqft</TableHead>
+              <TableHead className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Status</TableHead>
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {isPending
               ? Array.from({ length: 6 }).map((_, i) => (
-                  <TableRow key={i} className="border-gray-50 hover:bg-transparent">
+                  <TableRow key={i} className="border-gray-100">
                     {Array.from({ length: 11 }).map((_, j) => (
                       <TableCell key={j}><Skeleton className="h-4 rounded" /></TableCell>
                     ))}
@@ -186,7 +198,7 @@ export function WarehouseSlabTable({ warehouseId, onTransferRequest }: Props) {
               : isError
               ? (
                   <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={11} className="text-center py-12 text-sm text-muted-foreground">
+                    <TableCell colSpan={11} className="text-center py-14 text-sm text-gray-400">
                       Failed to load slabs.
                     </TableCell>
                   </TableRow>
@@ -194,13 +206,16 @@ export function WarehouseSlabTable({ warehouseId, onTransferRequest }: Props) {
               : slabs.length === 0
               ? (
                   <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={11} className="text-center py-16 text-sm text-muted-foreground">
-                      No slabs in this warehouse.
+                    <TableCell colSpan={11} className="text-center py-16">
+                      <p className="text-sm font-medium text-gray-500">No slabs found</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {search || statuses.length ? 'Try adjusting your filters.' : 'Add slabs from the Inventory page to assign them here.'}
+                      </p>
                     </TableCell>
                   </TableRow>
                 )
               : slabs.map(slab => (
-                  <TableRow key={slab.id} className="border-gray-50 group">
+                  <TableRow key={slab.id} className="border-gray-100 group hover:bg-gray-50/50">
                     <TableCell className="pl-4">
                       <Checkbox
                         checked={selected.has(slab.id)}
@@ -211,49 +226,54 @@ export function WarehouseSlabTable({ warehouseId, onTransferRequest }: Props) {
                     <TableCell>
                       {slab.primaryThumbUrl
                         ? (
-                            <div className="relative w-9 h-9 rounded-lg overflow-hidden border border-border">
+                            <div className="w-9 h-9 rounded-lg overflow-hidden border border-gray-200 shrink-0">
                               <img src={slab.primaryThumbUrl} alt="" className="w-full h-full object-cover" />
-                              {slab.photoCount > 1 && (
-                                <Badge className="absolute bottom-0.5 right-0.5 px-1 py-px text-[9px] h-auto min-w-0 rounded-sm bg-black/60 text-white border-0">
-                                  +{slab.photoCount - 1}
-                                </Badge>
-                              )}
                             </div>
                           )
                         : (
-                            <div className="w-9 h-9 rounded-lg border border-border bg-muted flex items-center justify-center">
-                              <ImageIcon className="w-3.5 h-3.5 text-muted-foreground/40" />
+                            <div className="w-9 h-9 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center shrink-0">
+                              <ImageIcon className="w-3.5 h-3.5 text-gray-300" />
                             </div>
                           )}
                     </TableCell>
                     <TableCell>
-                      <p className="text-[13px] font-medium text-foreground">{slab.materialName}</p>
-                      <p className="text-[11px] text-muted-foreground">{slab.internalRef}{slab.lotNumber ? ` · Lot ${slab.lotNumber}` : ''}</p>
+                      <p className="text-[13px] font-semibold text-gray-900">{slab.materialName}</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">
+                        {slab.internalRef}
+                        {slab.lotNumber ? <span> · Lot {slab.lotNumber}</span> : null}
+                      </p>
                     </TableCell>
                     <TableCell>
-                      <p className="text-[13px] text-foreground">{formatDimensions(slab.grossLengthMm, slab.grossWidthMm)}</p>
-                      <p className="text-[11px] text-muted-foreground">{formatThickness(slab.thicknessCm)}</p>
+                      <p className="text-[13px] text-gray-700">{formatDimensions(slab.grossLengthMm, slab.grossWidthMm)}</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">{formatThickness(slab.thicknessCm)}</p>
                     </TableCell>
-                    <TableCell className="text-[13px] text-foreground">{formatSqft(slab.netSqft)}</TableCell>
-                    <TableCell className="text-[13px] text-muted-foreground capitalize">{slab.finish}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={`w-6 h-6 rounded justify-center text-[11px] font-semibold p-0 ${
-                        slab.qualityGrade === 'A' ? 'bg-green-50 text-green-700 border-green-100' :
-                        slab.qualityGrade === 'B' ? 'bg-amber-50 text-amber-700 border-amber-100' :
-                        'bg-muted text-muted-foreground'
-                      }`}>{slab.qualityGrade}</Badge>
+                    <TableCell className="text-right text-[13px] text-gray-700">
+                      {formatSqft(slab.netSqft)}
                     </TableCell>
-                    <TableCell className="text-[13px] text-muted-foreground">
-                      {slab.rackLocation ?? <span className="text-muted-foreground/30">—</span>}
+                    <TableCell className="text-[13px] text-gray-500 capitalize">{slab.finish}</TableCell>
+                    <TableCell className="text-center">
+                      <span className={cn(
+                        'inline-flex items-center justify-center w-6 h-6 rounded text-[11px] font-bold border',
+                        slab.qualityGrade === 'A' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                        slab.qualityGrade === 'B' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                        'bg-gray-50 text-gray-500 border-gray-200',
+                      )}>
+                        {slab.qualityGrade}
+                      </span>
                     </TableCell>
-                    <TableCell>
-                      <p className="text-[13px] font-medium text-foreground">{formatPrice(slab.effectivePrice ?? 0)}</p>
+                    <TableCell className="text-[13px] text-gray-500">
+                      {slab.rackLocation ?? <span className="text-gray-300">—</span>}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <p className="text-[13px] font-semibold text-gray-900">
+                        {formatPrice(slab.effectivePrice ?? 0)}
+                      </p>
                       {slab.priceOverride != null && slab.basePrice != null && (
-                        <p className="text-[11px] text-muted-foreground line-through">{formatPrice(slab.basePrice)}</p>
+                        <p className="text-[11px] text-gray-400 line-through">{formatPrice(slab.basePrice)}</p>
                       )}
                     </TableCell>
                     <TableCell><SlabStatusBadge status={slab.status} /></TableCell>
-                    <TableCell className="pr-2">
+                    <TableCell className="pr-3">
                       <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                         <SlabActionsMenu slab={slab} />
                       </div>
@@ -267,14 +287,23 @@ export function WarehouseSlabTable({ warehouseId, onTransferRequest }: Props) {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">
-            {totalCount === 0 ? 'No slabs' : `${startItem}–${endItem} of ${totalCount}`}
+          <span className="text-xs text-gray-400">
+            {startItem}–{endItem} of {totalCount}
           </span>
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="sm" className="h-7 px-2" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+            <Button
+              variant="outline" size="sm" className="h-7 w-7 p-0 border-gray-200"
+              disabled={page <= 1} onClick={() => setPage(p => p - 1)}
+            >
               <ChevronLeft className="w-3.5 h-3.5" />
             </Button>
-            <Button variant="outline" size="sm" className="h-7 px-2" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+            <span className="text-xs text-gray-500 px-2">
+              {page} / {totalPages}
+            </span>
+            <Button
+              variant="outline" size="sm" className="h-7 w-7 p-0 border-gray-200"
+              disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}
+            >
               <ChevronRight className="w-3.5 h-3.5" />
             </Button>
           </div>
