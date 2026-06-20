@@ -69,6 +69,24 @@ export const DEV_TENANTS = {
     userEmail: 'owner@elitesurfaces.dev',
     userName:  'Angela Torres',
   },
+  mountainView: {
+    id:        '66666666-6666-6666-6666-666666666666',
+    type:      'fabricator' as TenantType,
+    name:      'Mountain View Countertops',
+    slug:      'mountain-view',
+    userId:    'aa000006-0000-0000-0000-000000000000',
+    userEmail: 'owner@mountainview.dev',
+    userName:  'Kevin Park',
+  },
+  prestigeStone: {
+    id:        '77777777-7777-7777-7777-777777777777',
+    type:      'fabricator' as TenantType,
+    name:      'Prestige Stone Works',
+    slug:      'prestige-stone',
+    userId:    'aa000007-0000-0000-0000-000000000000',
+    userEmail: 'owner@prestigestone.dev',
+    userName:  'Diana Walters',
+  },
 } satisfies Record<string, DevTenant>
 
 /**

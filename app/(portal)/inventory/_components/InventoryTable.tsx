@@ -57,7 +57,7 @@ export function InventoryTable() {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-2">
         <p className="text-sm text-muted-foreground">Failed to load inventory.</p>
-        <p className="text-xs text-muted-foreground/60">Make sure the API is running at localhost:5000</p>
+        <p className="text-xs text-muted-foreground/60">Make sure the API is running.</p>
       </div>
     )
   }
