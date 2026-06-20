@@ -7,6 +7,7 @@ import {
 } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { useCreateWarehouse, useUpdateWarehouse } from '@/lib/hooks/useWarehouses'
 import type { WarehouseDto } from '@/lib/types/api'
 import type { CreateWarehouseBody } from '@/lib/api/supplier/warehouses'
@@ -26,6 +27,8 @@ type FormValues = {
   country: string
   phone: string
   setAsPrimary: boolean
+  capacitySqft: string
+  notes: string
 }
 
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
@@ -45,6 +48,7 @@ export function AddWarehouseSheet({ open, onClose, editing }: Props) {
     defaultValues: {
       name: '', addressLine1: '', city: '', stateProvince: '',
       postalCode: '', country: 'US', phone: '', setAsPrimary: false,
+      capacitySqft: '', notes: '',
     },
   })
 
@@ -60,8 +64,14 @@ export function AddWarehouseSheet({ open, onClose, editing }: Props) {
             country:       editing.country,
             phone:         editing.phone ?? '',
             setAsPrimary:  editing.isPrimary,
+            capacitySqft:  editing.capacitySqft?.toString() ?? '',
+            notes:         editing.notes ?? '',
           }
-        : { name: '', addressLine1: '', city: '', stateProvince: '', postalCode: '', country: 'US', phone: '', setAsPrimary: false }
+        : {
+            name: '', addressLine1: '', city: '', stateProvince: '',
+            postalCode: '', country: 'US', phone: '', setAsPrimary: false,
+            capacitySqft: '', notes: '',
+          }
       )
     }
   }, [open, editing, reset])
@@ -76,6 +86,8 @@ export function AddWarehouseSheet({ open, onClose, editing }: Props) {
       country:       values.country || undefined,
       phone:         values.phone || undefined,
       setAsPrimary:  values.setAsPrimary,
+      capacitySqft:  values.capacitySqft ? parseFloat(values.capacitySqft) : null,
+      notes:         values.notes || null,
     }
     if (editing) {
       await update.mutateAsync(body)
@@ -161,6 +173,33 @@ export function AddWarehouseSheet({ open, onClose, editing }: Props) {
                   <FieldLabel>Country</FieldLabel>
                   <Input {...register('country')} placeholder="US" />
                 </div>
+              </div>
+            </div>
+
+            {/* Capacity & Notes */}
+            <div className="space-y-4">
+              <h3 className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">
+                Capacity &amp; Notes
+              </h3>
+              <div>
+                <FieldLabel>Storage Capacity (sq ft)</FieldLabel>
+                <Input
+                  {...register('capacitySqft')}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="e.g. 5000"
+                />
+                <p className="text-[11px] text-gray-400 mt-1">Used to calculate utilization percentage.</p>
+              </div>
+              <div>
+                <FieldLabel>Internal Notes</FieldLabel>
+                <Textarea
+                  {...register('notes')}
+                  placeholder="Operational notes, access instructions, etc."
+                  className="resize-none text-sm"
+                  rows={3}
+                />
               </div>
             </div>
 

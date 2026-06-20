@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   useWarehouseProducts,
   useReceiveWarehouseStock,
@@ -9,6 +10,7 @@ import {
   useSetWarehouseReorderPoint,
   useWarehouses,
 } from '@/lib/hooks/useWarehouses'
+import { productsApi } from '@/lib/api/supplier/products'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,7 +28,7 @@ import {
 import {
   Search, Plus, ChevronLeft, ChevronRight, MoreHorizontal,
   ArrowRightLeft, SlidersHorizontal, AlertTriangle, ImageIcon,
-  PackagePlus, Scale, X,
+  PackagePlus, Scale, X, Check, Loader2,
 } from 'lucide-react'
 import { formatPrice } from '@/lib/utils/formatters'
 import { cn } from '@/lib/utils'
@@ -62,6 +64,17 @@ function Label({ children }: { children: React.ReactNode }) {
 
 // ── Receive Stock dialog ──────────────────────────────────────────────────────
 
+type SelectedVariant = {
+  variantId: string
+  sku: string
+  variantName: string
+  productName: string
+  categoryLabel: string
+  unitOfMeasure: string
+  basePrice: number
+  photoUrl: string | null
+}
+
 function ReceiveStockDialog({
   warehouseId,
   open,
@@ -72,19 +85,75 @@ function ReceiveStockDialog({
   onClose: () => void
 }) {
   const receive = useReceiveWarehouseStock(warehouseId)
-  const [variantId,    setVariantId]    = useState('')
+
+  // Product search state
+  const [query,           setQuery]           = useState('')
+  const [debouncedQuery,  setDebouncedQuery]  = useState('')
+  const [selected,        setSelected]        = useState<SelectedVariant | null>(null)
+  const [showDropdown,    setShowDropdown]    = useState(false)
+  const searchRef = useRef<HTMLInputElement>(null)
+
+  // Form state
   const [qty,          setQty]          = useState('')
   const [rackLocation, setRackLocation] = useState('')
   const [notes,        setNotes]        = useState('')
 
+  // Debounce query
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedQuery(query), 350)
+    return () => clearTimeout(id)
+  }, [query])
+
+  // Reset on open/close
+  useEffect(() => {
+    if (!open) {
+      setQuery(''); setDebouncedQuery(''); setSelected(null)
+      setQty(''); setRackLocation(''); setNotes('')
+      setShowDropdown(false)
+    }
+  }, [open])
+
+  const { data: searchData, isFetching: searching } = useQuery({
+    queryKey: ['product-variant-search', debouncedQuery],
+    queryFn:  () => productsApi.list({ search: debouncedQuery, perPage: 8 }),
+    enabled:  debouncedQuery.length >= 2 && !selected,
+    staleTime: 30_000,
+  })
+
+  const variants: SelectedVariant[] = (searchData?.items ?? []).flatMap(p =>
+    p.variants.map(v => ({
+      variantId:     v.id,
+      sku:           v.sku,
+      variantName:   v.variantName,
+      productName:   p.name,
+      categoryLabel: p.categoryLabel,
+      unitOfMeasure: v.unitOfMeasure,
+      basePrice:     v.basePrice,
+      photoUrl:      v.primaryPhotoUrl,
+    }))
+  )
+
+  function selectVariant(v: SelectedVariant) {
+    setSelected(v)
+    setShowDropdown(false)
+    setQuery('')
+  }
+
+  function clearSelection() {
+    setSelected(null)
+    setQuery('')
+    setTimeout(() => searchRef.current?.focus(), 50)
+  }
+
   function handleClose() {
-    setVariantId(''); setQty(''); setRackLocation(''); setNotes('')
     onClose()
   }
 
+  const canSubmit = !!selected && !!qty && parseInt(qty) >= 1 && !receive.isPending
+
   return (
     <Dialog open={open} onOpenChange={v => !v && handleClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <PackagePlus className="w-4 h-4 text-emerald-600" />
@@ -93,26 +162,98 @@ function ReceiveStockDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-1">
+
+          {/* ── Product picker ── */}
           <div>
-            <Label>Variant ID</Label>
-            <Input
-              value={variantId}
-              onChange={e => setVariantId(e.target.value)}
-              placeholder="Paste product variant UUID…"
-            />
-            <p className="text-[11px] text-gray-400 mt-1">
-              Find the variant ID from Inventory → Products → variant row.
-            </p>
+            <Label>Product</Label>
+
+            {selected ? (
+              /* Selected state — show chip */
+              <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-emerald-200 bg-emerald-50">
+                {selected.photoUrl
+                  ? <img src={selected.photoUrl} alt="" className="w-8 h-8 rounded object-cover shrink-0 border border-emerald-100" />
+                  : <div className="w-8 h-8 rounded bg-emerald-100 flex items-center justify-center shrink-0"><ImageIcon className="w-3.5 h-3.5 text-emerald-400" /></div>
+                }
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 truncate">{selected.variantName}</p>
+                  <p className="text-[11px] text-gray-500">
+                    {selected.sku} · {selected.categoryLabel} · {formatPrice(selected.basePrice)}/{selected.unitOfMeasure}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearSelection}
+                  className="shrink-0 text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-emerald-100 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              /* Search state */
+              <div className="relative">
+                <div className="relative">
+                  {searching
+                    ? <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 animate-spin" />
+                    : <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  }
+                  <Input
+                    ref={searchRef}
+                    value={query}
+                    onChange={e => { setQuery(e.target.value); setShowDropdown(true) }}
+                    onFocus={() => setShowDropdown(true)}
+                    placeholder="Search by product name or SKU…"
+                    className="pl-9"
+                    autoFocus
+                  />
+                </div>
+
+                {/* Dropdown results */}
+                {showDropdown && debouncedQuery.length >= 2 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden max-h-60 overflow-y-auto">
+                    {variants.length === 0 && !searching && (
+                      <p className="text-xs text-gray-400 px-4 py-3">
+                        No products found for "{debouncedQuery}".
+                      </p>
+                    )}
+                    {variants.map(v => (
+                      <button
+                        key={v.variantId}
+                        type="button"
+                        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 text-left transition-colors border-b border-gray-50 last:border-0"
+                        onClick={() => selectVariant(v)}
+                      >
+                        {v.photoUrl
+                          ? <img src={v.photoUrl} alt="" className="w-7 h-7 rounded object-cover shrink-0 border border-gray-200" />
+                          : <div className="w-7 h-7 rounded bg-gray-100 flex items-center justify-center shrink-0"><ImageIcon className="w-3 h-3 text-gray-300" /></div>
+                        }
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{v.variantName}</p>
+                          <p className="text-[11px] text-gray-400 truncate">
+                            {v.sku} · {v.categoryLabel}
+                          </p>
+                        </div>
+                        <span className="text-xs font-semibold text-gray-600 shrink-0">
+                          {formatPrice(v.basePrice)}/{v.unitOfMeasure}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
+          {/* ── Qty + rack ── */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>Quantity</Label>
+              <Label>Quantity {selected && <span className="text-gray-400 font-normal">({selected.unitOfMeasure})</span>}</Label>
               <Input
-                type="number" min={1}
+                type="number"
+                min={1}
                 value={qty}
                 onChange={e => setQty(e.target.value)}
                 placeholder="0"
+                disabled={!selected}
               />
             </div>
             <div>
@@ -121,33 +262,54 @@ function ReceiveStockDialog({
                 value={rackLocation}
                 onChange={e => setRackLocation(e.target.value)}
                 placeholder="e.g. A-03-2"
+                disabled={!selected}
               />
             </div>
           </div>
 
+          {/* ── Notes ── */}
           <div>
-            <Label>Notes (optional)</Label>
+            <Label>Notes <span className="text-gray-400 font-normal">(optional)</span></Label>
             <Input
               value={notes}
               onChange={e => setNotes(e.target.value)}
-              placeholder="PO ref, supplier, delivery note…"
+              placeholder="PO reference, supplier, delivery note…"
+              disabled={!selected}
             />
           </div>
+
+          {/* Preview */}
+          {selected && qty && parseInt(qty) > 0 && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-100 rounded-lg text-xs text-emerald-700">
+              <Check className="w-3.5 h-3.5 shrink-0" />
+              Receiving <strong>{qty} {selected.unitOfMeasure}</strong> of <strong>{selected.sku}</strong>
+              {rackLocation && <> → rack <strong>{rackLocation}</strong></>}
+            </div>
+          )}
         </div>
 
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={handleClose}>Cancel</Button>
           <Button
             size="sm"
-            disabled={receive.isPending || !variantId.trim() || !qty || parseInt(qty) < 1}
+            className="gap-1.5"
+            disabled={!canSubmit}
             onClick={() =>
               receive.mutate(
-                { variantId: variantId.trim(), qty: parseInt(qty), rackLocation: rackLocation || undefined, notes: notes || undefined },
+                {
+                  variantId:    selected!.variantId,
+                  qty:          parseInt(qty),
+                  rackLocation: rackLocation || undefined,
+                  notes:        notes || undefined,
+                },
                 { onSuccess: handleClose },
               )
             }
           >
-            {receive.isPending ? 'Receiving…' : 'Receive Stock'}
+            {receive.isPending
+              ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Receiving…</>
+              : <><PackagePlus className="w-3.5 h-3.5" /> Receive Stock</>
+            }
           </Button>
         </DialogFooter>
       </DialogContent>

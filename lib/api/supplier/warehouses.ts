@@ -1,5 +1,5 @@
 import { api } from '@/lib/api/client'
-import type { WarehouseDto, WarehouseProductStockDto, StockMovementDto } from '@/lib/types/api'
+import type { WarehouseDto, WarehouseProductStockDto, StockMovementDto, WarehouseAuditEventDto, WarehouseBundleDto } from '@/lib/types/api'
 
 const BASE = '/api/v1/supplier/warehouses'
 
@@ -12,6 +12,8 @@ export interface CreateWarehouseBody {
   country?: string
   phone?: string
   setAsPrimary: boolean
+  capacitySqft?: number | null
+  notes?: string | null
 }
 
 export interface UpdateWarehouseBody {
@@ -22,6 +24,8 @@ export interface UpdateWarehouseBody {
   postalCode?: string
   country?: string
   phone?: string
+  capacitySqft?: number | null
+  notes?: string | null
 }
 
 export interface TransferSlabsBody {
@@ -99,4 +103,9 @@ export const warehousesApi = {
     api.patch<void>(`${BASE}/${id}/products/reorder`, body),
   getStockMovements: (id: string, limit = 100) =>
     api.get<StockMovementDto[]>(`${BASE}/${id}/stock-movements?limit=${limit}`),
+  getHistory: (id: string, limit = 200) =>
+    api.get<WarehouseAuditEventDto[]>(`${BASE}/${id}/history?limit=${limit}`),
+  getBundles: (id: string) =>
+    api.get<WarehouseBundleDto[]>(`${BASE}/${id}/bundles`),
+  exportSlabs: (id: string) => `${BASE}/${id}/export`,
 }

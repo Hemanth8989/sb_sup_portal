@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { use } from 'react'
 import {
   ArrowLeft, MapPin, Phone, Star, PowerOff, Pencil,
-  Layers, Package, AlertTriangle, ArrowRightLeft,
+  Layers, Package, AlertTriangle, ArrowRightLeft, History, Download, BookOpen,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -14,10 +14,14 @@ import { AddWarehouseSheet } from '../_components/AddWarehouseSheet'
 import { TransferSlabsModal } from './_components/TransferSlabsModal'
 import { WarehouseSlabTable } from './_components/WarehouseSlabTable'
 import { WarehouseProductTable } from './_components/WarehouseProductTable'
-import { formatPrice } from '@/lib/utils/formatters'
+import { WarehouseSlabSummary } from './_components/WarehouseSlabSummary'
+import { WarehouseProductSummary } from './_components/WarehouseProductSummary'
+import { WarehouseHistory } from './_components/WarehouseHistory'
+import { WarehouseBundleView } from './_components/WarehouseBundleView'
+import { warehousesApi } from '@/lib/api/supplier/warehouses'
 import { cn } from '@/lib/utils'
 
-type Tab = 'slabs' | 'products'
+type Tab = 'slabs' | 'products' | 'bundles' | 'history'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -39,17 +43,24 @@ export default function WarehouseDetailPage({ params }: Props) {
     setTransferOpen(true)
   }
 
-  // ── Loading ──────────────────────────────────────────────────────────────────
+  // ── Loading ───────────────────────────────────────────────────────────────
   if (isPending) {
     return (
       <div className="flex flex-col h-full bg-gray-50">
+        <div className="bg-white border-b border-gray-200 px-6 h-14 flex items-center">
+          <Skeleton className="h-4 w-48" />
+        </div>
         <div className="bg-white border-b border-gray-200 px-6 py-4">
-          <Skeleton className="h-5 w-52" />
+          <Skeleton className="h-4 w-64" />
         </div>
         <div className="p-6 flex flex-col gap-4">
-          <Skeleton className="h-28 rounded-xl" />
-          <Skeleton className="h-10 rounded-xl" />
-          <Skeleton className="h-80 rounded-xl" />
+          <div className="grid grid-cols-5 gap-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-20 rounded-xl" />
+            ))}
+          </div>
+          <Skeleton className="h-10 rounded-lg" />
+          <Skeleton className="h-72 rounded-xl" />
         </div>
       </div>
     )
@@ -58,7 +69,7 @@ export default function WarehouseDetailPage({ params }: Props) {
   if (isError || !wh) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 bg-gray-50">
-        <p className="text-sm text-muted-foreground">Warehouse not found.</p>
+        <p className="text-sm text-gray-500">Warehouse not found.</p>
         <Link href="/warehouses">
           <Button variant="outline" size="sm">← Back to Warehouses</Button>
         </Link>
@@ -72,15 +83,15 @@ export default function WarehouseDetailPage({ params }: Props) {
   return (
     <div className="flex flex-col h-full bg-gray-50">
 
-      {/* ── Topbar ──────────────────────────────────────────────────────────── */}
+      {/* ── Topbar ─────────────────────────────────────────────────────────── */}
       <div className="bg-white border-b border-gray-200 px-6 h-14 flex items-center gap-3 shrink-0">
         <Link href="/warehouses">
-          <button className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-gray-900 transition-colors">
+          <button className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 transition-colors">
             <ArrowLeft className="w-3.5 h-3.5" />
             Warehouses
           </button>
         </Link>
-        <span className="text-gray-300">/</span>
+        <span className="text-gray-200">/</span>
         <span className="text-sm font-semibold text-gray-900">{wh.name}</span>
 
         {wh.isPrimary && (
@@ -90,7 +101,7 @@ export default function WarehouseDetailPage({ params }: Props) {
           </span>
         )}
         {!wh.isActive && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-[10px] font-medium text-gray-500">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-[10px] font-medium text-gray-400">
             Inactive
           </span>
         )}
@@ -104,8 +115,7 @@ export default function WarehouseDetailPage({ params }: Props) {
             disabled={setPrimary.isPending}
             onClick={() => setPrimary.mutate(id)}
           >
-            <Star className="w-3.5 h-3.5" />
-            Set Primary
+            <Star className="w-3.5 h-3.5" /> Set Primary
           </Button>
         )}
         {wh.isActive && (
@@ -119,8 +129,7 @@ export default function WarehouseDetailPage({ params }: Props) {
               }
             }}
           >
-            <PowerOff className="w-3.5 h-3.5" />
-            Deactivate
+            <PowerOff className="w-3.5 h-3.5" /> Deactivate
           </Button>
         )}
         <Button
@@ -128,192 +137,185 @@ export default function WarehouseDetailPage({ params }: Props) {
           className="h-8 text-xs gap-1.5"
           onClick={() => setEditOpen(true)}
         >
-          <Pencil className="w-3.5 h-3.5" />
-          Edit Details
+          <Pencil className="w-3.5 h-3.5" /> Edit Details
         </Button>
       </div>
 
-      {/* ── Scrollable body ──────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto">
-
-        {/* ── Info + KPI strip ──────────────────────────────────────────────── */}
-        <div className="bg-white border-b border-gray-200 px-6 py-5">
-
-          {/* Location / phone */}
-          <div className="flex flex-wrap items-center gap-4 mb-5">
-            {location && (
-              <span className="inline-flex items-center gap-1.5 text-sm text-gray-600">
-                <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                {location}
-              </span>
-            )}
-            {wh.phone && (
-              <span className="inline-flex items-center gap-1.5 text-sm text-gray-600">
-                <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                {wh.phone}
-              </span>
-            )}
-          </div>
-
-          {/* Unified KPI row */}
-          <div className="flex items-stretch divide-x divide-gray-100">
-
-            {/* Slab KPIs */}
-            <div className="flex items-stretch divide-x divide-gray-100 pr-6">
-              <div className="pr-6">
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1">
-                  <Layers className="w-3 h-3" /> Stone Slabs
-                </p>
-                <div className="flex items-end gap-1">
-                  <span className="text-2xl font-bold text-gray-900 leading-none">{wh.slabCount}</span>
-                  <span className="text-xs text-gray-400 mb-0.5">total</span>
-                </div>
-              </div>
-
-              {[
-                { label: 'Available', value: wh.availableCount, color: 'text-emerald-700' },
-                { label: 'Reserved',  value: wh.reservedCount,  color: 'text-blue-700'    },
-                { label: 'On Hold',   value: wh.onHoldCount,    color: 'text-amber-600'   },
-              ].map(k => (
-                <div key={k.label} className="px-5">
-                  <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">{k.label}</p>
-                  <p className={`text-xl font-bold leading-none ${k.color}`}>{k.value}</p>
-                </div>
-              ))}
-
-              <div className="pl-5">
-                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Est. Value</p>
-                <p className="text-xl font-bold leading-none text-gray-900">
-                  {wh.estimatedValue != null ? formatPrice(wh.estimatedValue) : '—'}
-                </p>
-              </div>
-            </div>
-
-            {/* Product KPIs */}
-            <div className="flex items-stretch divide-x divide-gray-100 pl-6">
-              <div className="pr-5">
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1">
-                  <Package className="w-3 h-3" /> Products & Supplies
-                </p>
-                <div className="flex items-end gap-1">
-                  <span className="text-2xl font-bold text-gray-900 leading-none">{wh.productSkuCount}</span>
-                  <span className="text-xs text-gray-400 mb-0.5">SKUs</span>
-                </div>
-              </div>
-
-              <div className="px-5">
-                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Low Stock</p>
-                <p className={`text-xl font-bold leading-none flex items-center gap-1 ${
-                  wh.lowStockCount > 0 ? 'text-red-600' : 'text-emerald-700'
-                }`}>
-                  {wh.lowStockCount > 0 && <AlertTriangle className="w-3.5 h-3.5" />}
-                  {wh.lowStockCount}
-                </p>
-              </div>
-
-              <div className="pl-5">
-                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Stock Value</p>
-                <p className="text-xl font-bold leading-none text-gray-900">
-                  {wh.productStockValue != null ? formatPrice(wh.productStockValue) : '—'}
-                </p>
-              </div>
-            </div>
-          </div>
+      {/* ── Location strip ─────────────────────────────────────────────────── */}
+      {(location || wh.phone) && (
+        <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-5 shrink-0">
+          {location && (
+            <span className="flex items-center gap-1.5 text-xs text-gray-500">
+              <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              {location}
+            </span>
+          )}
+          {wh.phone && (
+            <span className="flex items-center gap-1.5 text-xs text-gray-500">
+              <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              {wh.phone}
+            </span>
+          )}
         </div>
+      )}
 
-        {/* ── Tabs ─────────────────────────────────────────────────────────── */}
-        <div className="bg-white border-b border-gray-200 px-6 flex items-center gap-0 shrink-0">
-          {([
-            {
-              key:   'slabs' as const,
-              icon:  <Layers className="w-3.5 h-3.5" />,
-              label: 'Stone Slabs',
-              count: wh.slabCount,
-            },
-            {
-              key:   'products' as const,
-              icon:  <Package className="w-3.5 h-3.5" />,
-              label: 'Products & Supplies',
-              count: wh.productSkuCount,
-              alert: wh.lowStockCount,
-            },
-          ] as const).map(t => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={cn(
-                'flex items-center gap-2 px-5 py-3 text-xs font-medium border-b-2 transition-colors whitespace-nowrap',
-                tab === t.key
-                  ? 'border-gray-900 text-gray-900'
-                  : 'border-transparent text-gray-500 hover:text-gray-700',
-              )}
-            >
-              {t.icon}
-              {t.label}
-              {t.count > 0 && (
-                <span className={cn(
-                  'px-1.5 py-0.5 rounded text-[10px] font-semibold',
-                  tab === t.key ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500',
-                )}>
-                  {t.count}
-                </span>
-              )}
-              {'alert' in t && t.alert > 0 && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-700">
-                  {t.alert} low
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+      {/* ── Tabs ───────────────────────────────────────────────────────────── */}
+      <div className="bg-white border-b border-gray-200 px-6 flex items-center shrink-0">
+        <button
+          onClick={() => setTab('slabs')}
+          className={cn(
+            'flex items-center gap-2 px-1 py-3 mr-6 text-xs font-medium border-b-2 transition-colors',
+            tab === 'slabs'
+              ? 'border-gray-900 text-gray-900'
+              : 'border-transparent text-gray-400 hover:text-gray-700',
+          )}
+        >
+          <Layers className="w-3.5 h-3.5" />
+          Stone Slabs
+          <span className={cn(
+            'px-1.5 py-0.5 rounded text-[10px] font-semibold',
+            tab === 'slabs' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500',
+          )}>
+            {wh.slabCount}
+          </span>
+        </button>
 
-        {/* ── Tab body ─────────────────────────────────────────────────────── */}
-        <div className="p-6">
-          {tab === 'slabs' && (
+        <button
+          onClick={() => setTab('products')}
+          className={cn(
+            'flex items-center gap-2 px-1 py-3 mr-6 text-xs font-medium border-b-2 transition-colors',
+            tab === 'products'
+              ? 'border-gray-900 text-gray-900'
+              : 'border-transparent text-gray-400 hover:text-gray-700',
+          )}
+        >
+          <Package className="w-3.5 h-3.5" />
+          Products & Supplies
+          <span className={cn(
+            'px-1.5 py-0.5 rounded text-[10px] font-semibold',
+            tab === 'products' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500',
+          )}>
+            {wh.productSkuCount}
+          </span>
+          {wh.lowStockCount > 0 && (
+            <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-700">
+              <AlertTriangle className="w-2.5 h-2.5" />
+              {wh.lowStockCount} low
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setTab('bundles')}
+          className={cn(
+            'flex items-center gap-2 px-1 py-3 mr-6 text-xs font-medium border-b-2 transition-colors',
+            tab === 'bundles'
+              ? 'border-gray-900 text-gray-900'
+              : 'border-transparent text-gray-400 hover:text-gray-700',
+          )}
+        >
+          <BookOpen className="w-3.5 h-3.5" />
+          Bundles &amp; Lots
+        </button>
+
+        <button
+          onClick={() => setTab('history')}
+          className={cn(
+            'flex items-center gap-2 px-1 py-3 text-xs font-medium border-b-2 transition-colors',
+            tab === 'history'
+              ? 'border-gray-900 text-gray-900'
+              : 'border-transparent text-gray-400 hover:text-gray-700',
+          )}
+        >
+          <History className="w-3.5 h-3.5" />
+          History
+        </button>
+      </div>
+
+      {/* ── Tab body ───────────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto p-6">
+
+        {/* ── Slabs tab ──────────────────────────────────────────────────── */}
+        {tab === 'slabs' && (
+          <>
+            <WarehouseSlabSummary warehouse={wh} />
+
             <div className="bg-white rounded-xl border border-gray-200">
               <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                <div>
-                  <h2 className="text-sm font-semibold text-gray-900">Slab Inventory</h2>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {wh.slabCount} total · {wh.availableCount} available
-                  </p>
+                <h2 className="text-sm font-semibold text-gray-900">Slab Inventory</h2>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={warehousesApi.exportSlabs(id)}
+                    download={`warehouse-slabs-${id}.csv`}
+                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Export CSV
+                  </a>
+                  <Button
+                    size="sm" variant="outline"
+                    className="h-8 text-xs gap-1.5"
+                    onClick={() => openTransfer([])}
+                  >
+                    <ArrowRightLeft className="w-3.5 h-3.5" />
+                    Transfer Slabs
+                  </Button>
                 </div>
-                <Button
-                  size="sm" variant="outline"
-                  className="h-8 text-xs gap-1.5"
-                  onClick={() => openTransfer([])}
-                >
-                  <ArrowRightLeft className="w-3.5 h-3.5" />
-                  Transfer Slabs
-                </Button>
               </div>
               <div className="p-5">
                 <WarehouseSlabTable warehouseId={id} onTransferRequest={openTransfer} />
               </div>
             </div>
-          )}
+          </>
+        )}
 
-          {tab === 'products' && (
+        {/* ── Products tab ───────────────────────────────────────────────── */}
+        {tab === 'products' && (
+          <>
+            <WarehouseProductSummary warehouse={wh} />
+
             <div className="bg-white rounded-xl border border-gray-200">
-              <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                <div>
-                  <h2 className="text-sm font-semibold text-gray-900">Products & Supplies</h2>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {wh.productSkuCount} SKUs stocked
-                    {wh.lowStockCount > 0 && (
-                      <span className="ml-2 text-red-600 font-medium">
-                        · {wh.lowStockCount} below reorder point
-                      </span>
-                    )}
-                  </p>
-                </div>
+              <div className="px-5 py-4 border-b border-gray-100">
+                <h2 className="text-sm font-semibold text-gray-900">Products & Supplies</h2>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Stock levels tracked per warehouse. Use "Receive Stock" to add inventory.
+                </p>
               </div>
               <div className="p-5">
                 <WarehouseProductTable warehouseId={id} />
               </div>
             </div>
-          )}
-        </div>
+          </>
+        )}
+        {/* ── Bundles tab ────────────────────────────────────────────────── */}
+        {tab === 'bundles' && (
+          <div className="bg-white rounded-xl border border-gray-200">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h2 className="text-sm font-semibold text-gray-900">Bundles &amp; Lots</h2>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Slabs grouped by quarry bundle or lot number. Useful for identifying bookmatched sets.
+              </p>
+            </div>
+            <div className="p-5">
+              <WarehouseBundleView warehouseId={id} />
+            </div>
+          </div>
+        )}
+
+        {/* ── History tab ────────────────────────────────────────────────── */}
+        {tab === 'history' && (
+          <div className="bg-white rounded-xl border border-gray-200">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h2 className="text-sm font-semibold text-gray-900">Activity History</h2>
+              <p className="text-xs text-gray-400 mt-0.5">
+                All slab transfers, status changes, and product stock movements for this warehouse.
+              </p>
+            </div>
+            <div className="p-5">
+              <WarehouseHistory warehouseId={id} />
+            </div>
+          </div>
+        )}
       </div>
 
       <AddWarehouseSheet open={editOpen} onClose={() => setEditOpen(false)} editing={wh} />

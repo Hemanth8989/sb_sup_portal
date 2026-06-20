@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Warehouse } from 'lucide-react'
+import { Plus, Warehouse, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { WarehouseCard } from './_components/WarehouseCard'
@@ -28,6 +28,22 @@ export default function WarehousesPage() {
           Add Warehouse
         </Button>
       </div>
+
+      {/* Low-stock alert banner */}
+      {warehouses && warehouses.reduce((n, w) => n + w.lowStockCount, 0) > 0 && (() => {
+        const total = warehouses.reduce((n, w) => n + w.lowStockCount, 0)
+        const whCount = warehouses.filter(w => w.lowStockCount > 0).length
+        return (
+          <div className="mx-6 mt-4 flex items-center gap-3 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm">
+            <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
+            <p className="text-red-700 font-medium">
+              {total} SKU{total !== 1 ? 's' : ''} below reorder point
+              {' '}across {whCount} warehouse{whCount !== 1 ? 's' : ''}.
+            </p>
+            <p className="text-red-500 text-xs">Open a warehouse and go to Products &amp; Supplies to restock.</p>
+          </div>
+        )
+      })()}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6">

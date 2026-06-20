@@ -97,6 +97,8 @@ export interface WarehouseDto {
   productSkuCount: number
   lowStockCount: number
   productStockValue: number | null
+  capacitySqft: number | null
+  notes: string | null
   createdAt: string
   updatedAt: string
 }
@@ -136,6 +138,37 @@ export interface StockMovementDto {
   qty: number
   movementType: string
   notes: string | null
+  createdAt: string
+}
+
+export interface WarehouseBundleDto {
+  bundleId: string | null
+  groupRef: string | null
+  groupType: 'bundle' | 'lot' | 'ungrouped'
+  materialName: string
+  originCountry: string | null
+  quarryName: string | null
+  arrivalDate: string | null
+  invoiceRef: string | null
+  slabCount: number
+  availableCount: number
+  reservedCount: number
+  onHoldCount: number
+  totalSqft: number | null
+  estimatedValue: number | null
+  firstReceivedAt: string
+}
+
+export interface WarehouseAuditEventDto {
+  id: string
+  eventSource: 'stock_movement' | 'slab_transfer' | 'slab_event'
+  eventType: string
+  description: string
+  subjectRef: string | null
+  oldValue: string | null
+  newValue: string | null
+  notes: string | null
+  qty: number | null
   createdAt: string
 }
 

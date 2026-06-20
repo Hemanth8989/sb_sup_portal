@@ -12,10 +12,12 @@ import {
 } from '@/lib/api/supplier/warehouses'
 
 const KEYS = {
-  all:          ['warehouses']                             as const,
-  one:          (id: string) => ['warehouses', id]         as const,
-  products:     (id: string) => ['warehouses', id, 'products'] as const,
-  movements:    (id: string) => ['warehouses', id, 'movements'] as const,
+  all:       ['warehouses']                                   as const,
+  one:       (id: string) => ['warehouses', id]               as const,
+  products:  (id: string) => ['warehouses', id, 'products']   as const,
+  movements: (id: string) => ['warehouses', id, 'movements']  as const,
+  history:   (id: string) => ['warehouses', id, 'history']    as const,
+  bundles:   (id: string) => ['warehouses', id, 'bundles']    as const,
 }
 
 export function useWarehouses() {
@@ -138,6 +140,22 @@ export function useStockMovements(warehouseId: string, limit = 100) {
   return useQuery({
     queryKey: [...KEYS.movements(warehouseId), limit],
     queryFn:  () => warehousesApi.getStockMovements(warehouseId, limit),
+    enabled:  !!warehouseId,
+  })
+}
+
+export function useWarehouseHistory(warehouseId: string, limit = 200) {
+  return useQuery({
+    queryKey: [...KEYS.history(warehouseId), limit],
+    queryFn:  () => warehousesApi.getHistory(warehouseId, limit),
+    enabled:  !!warehouseId,
+  })
+}
+
+export function useWarehouseBundles(warehouseId: string) {
+  return useQuery({
+    queryKey: KEYS.bundles(warehouseId),
+    queryFn:  () => warehousesApi.getBundles(warehouseId),
     enabled:  !!warehouseId,
   })
 }
