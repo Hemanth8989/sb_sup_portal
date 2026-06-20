@@ -18,4 +18,7 @@ export const connectionsApi = {
 
   assignPriceList: (id: string, priceListId: string | null) =>
     api.patch<void>(`${BASE}/${id}/price-list`, { priceListId }),
+
+  updateNotes: (id: string, notes: string | null) =>
+    api.patch<ConnectionDto>(`${BASE}/${id}/notes`, { fabricatorNotes: notes }),
 }

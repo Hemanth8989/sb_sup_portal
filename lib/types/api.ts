@@ -284,6 +284,63 @@ export interface ProductInventoryFilterParams {
   perPage?: number
 }
 
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+export type NotificationType =
+  | 'new_po' | 'po_acknowledged' | 'po_partially_acked' | 'po_countered'
+  | 'po_confirmed' | 'po_shipped' | 'po_received' | 'po_disputed' | 'po_cancelled'
+  | 'connection_requested' | 'connection_approved' | 'connection_declined'
+  | 'connection_suspended' | 'connection_terminated'
+  | 'price_changed' | 'new_stock' | 'low_stock_warning' | 'po_unacked_24h'
+  | 'delivery_confirmed' | 'system'
+
+export interface NotificationDto {
+  id: string
+  type: NotificationType
+  title: string
+  body: string
+  entityType: string | null
+  entityId: string | null
+  linkUrl: string | null
+  isRead: boolean
+  readAt: string | null
+  createdAt: string
+}
+
+// ── Analytics ─────────────────────────────────────────────────────────────────
+
+export interface InventoryAnalytics {
+  statusBreakdown: { status: string; slabCount: number; totalSqft: number }[]
+  weeklyTrend: { week: string; slabsAdded: number; sqftAdded: number }[]
+  slowMovers: {
+    id: string; internalRef: string; materialName: string
+    netSqft: number; estValue: number | null; daysInStatus: number
+    rackLocation: string | null; warehouseName: string | null
+  }[]
+  avgDaysInStatus: { materialName: string; status: string; avgDays: number }[]
+}
+
+export interface RevenueAnalytics {
+  monthlyRevenue: { month: string; poCount: number; revenue: number }[]
+  revenueByMaterial: { materialName: string; slabsSold: number; sqftSold: number; revenue: number }[]
+  priceOverrideUsage: { withOverride: number; withoutOverride: number }
+}
+
+export interface OrderAnalytics {
+  funnel: { status: string; poCount: number }[]
+  stageTiming: { avgHrsToAck: number | null; avgHrsToShip: number | null; avgHrsToReceive: number | null }
+  topBuyers: { fabricatorName: string; poCount: number; totalSpend: number }[]
+  cancellationRate: number
+}
+
+export interface ConnectionAnalytics {
+  byStatusAndTier: { status: string; pricingTier: string; count: number }[]
+  monthlyGrowth: { month: string; newConnections: number }[]
+  topCities: { city: string | null; state: string | null; connectionCount: number }[]
+}
+
+export type AnalyticsRange = '7d' | '30d' | '90d' | '365d'
+
 export interface SupplierSlabFilterParams {
   searchQuery?: string
   statuses?: SlabStatus[]

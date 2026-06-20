@@ -7,7 +7,7 @@ const keys = {
   detail: (id: string) => ['purchase-orders', id]  as const,
 }
 
-export function usePurchaseOrders(params: { status?: string; page?: number; perPage?: number } = {}) {
+export function usePurchaseOrders(params: { status?: string; search?: string; page?: number; perPage?: number } = {}) {
   return useQuery({
     queryKey: keys.list(params),
     queryFn:  () => purchaseOrdersApi.list(params),
@@ -42,6 +42,29 @@ export function useShipPo() {
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: keys.detail(id) })
       qc.invalidateQueries({ queryKey: keys.all })
+    },
+  })
+}
+
+export function useCancelPo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      purchaseOrdersApi.cancel(id, reason),
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: keys.detail(id) })
+      qc.invalidateQueries({ queryKey: keys.all })
+    },
+  })
+}
+
+export function useUpdatePoNotes() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, notes }: { id: string; notes: string | null }) =>
+      purchaseOrdersApi.updateNotes(id, notes),
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: keys.detail(id) })
     },
   })
 }

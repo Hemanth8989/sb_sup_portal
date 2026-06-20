@@ -9,6 +9,7 @@ import {
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { CURRENT_DEV_TENANT } from '@/lib/config/devTenants'
+import { useUnreadCount } from '@/lib/hooks/useNotifications'
 
 const IS_DEV_AUTH = process.env.NEXT_PUBLIC_DEV_AUTH === 'true'
 
@@ -53,6 +54,8 @@ const NAV = [
 
 export function Sidebar() {
   const pathname = usePathname()
+  const { data: unreadData } = useUnreadCount()
+  const unreadCount = unreadData?.count ?? 0
 
   // Initials from tenant name
   const initials = tenant.name
@@ -105,11 +108,17 @@ export function Sidebar() {
                   >
                     <item.icon className="w-3.5 h-3.5 shrink-0" strokeWidth={1.75} />
                     <span className="flex-1">{item.label}</span>
-                    {'badge' in item && item.badge != null && (
-                      <span className="bg-gray-900 text-white text-[10px] font-semibold rounded-full px-1.5 py-px leading-none">
-                        {item.badge}
-                      </span>
-                    )}
+                    {item.href === '/notifications' && unreadCount > 0
+                      ? (
+                          <span className="bg-red-500 text-white text-[10px] font-semibold rounded-full px-1.5 py-px leading-none">
+                            {unreadCount > 99 ? '99+' : unreadCount}
+                          </span>
+                        )
+                      : 'badge' in item && item.badge != null && (
+                          <span className="bg-red-500 text-white text-[10px] font-semibold rounded-full px-1.5 py-px leading-none">
+                            {item.badge}
+                          </span>
+                        )}
                   </Link>
                 )
               })}

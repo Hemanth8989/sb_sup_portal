@@ -66,3 +66,12 @@ export function useRemovePriceListItem() {
     onSuccess: (_, { id }) => qc.invalidateQueries({ queryKey: keys.detail(id) }),
   })
 }
+
+export function useClonePriceList() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) =>
+      priceListsApi.clone(id, name),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.all }),
+  })
+}

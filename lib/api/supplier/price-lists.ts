@@ -24,4 +24,7 @@ export const priceListsApi = {
 
   removeItem: (id: string, itemId: string) =>
     api.delete<void>(`${BASE}/${id}/items/${itemId}`),
+
+  clone: (id: string, name: string) =>
+    api.post<PriceListDto>(`${BASE}/${id}/clone`, { name }),
 }

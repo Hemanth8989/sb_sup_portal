@@ -54,3 +54,14 @@ export function useAssignPriceList() {
     },
   })
 }
+
+export function useUpdateConnectionNotes() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, notes }: { id: string; notes: string | null }) =>
+      connectionsApi.updateNotes(id, notes),
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: keys.detail(id) })
+    },
+  })
+}
